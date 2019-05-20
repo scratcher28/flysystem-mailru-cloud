@@ -1,0 +1,33 @@
+{
+    "name": "freecod/flysystem-mailru-cloud",
+    "description": "Flysystem Adapter for the mail.ru cloud",
+    "keywords": [
+        "mail.ru",
+        "mail.ru cloud",
+        "flysystem-mailru",
+        "flysystem",
+        "mailrucloud"
+    ],
+    "homepage": "https://github.com/freecod/flysystem-mailru-clou",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "freecod",
+            "email": "freecod@mail.ru",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^7.0",
+        "league/flysystem": "^1.0",
+        "friday14/cloud-mail-ru": "dev-master"
+    },
+    "autoload": {
+        "psr-4": {
+            "Freecod\\FlysystemMailRuCloud\\": "src"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
