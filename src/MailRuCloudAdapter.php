@@ -7,6 +7,7 @@ use GuzzleHttp\Exception\ClientException;
 use League\Flysystem\Adapter\AbstractAdapter;
 use League\Flysystem\Adapter\Polyfill\NotSupportingVisibilityTrait;
 use League\Flysystem\Config;
+use League\Flysystem\FileNotFoundException;
 use League\Flysystem\Util\MimeType;
 
 class MailRuCloudAdapter extends AbstractAdapter
@@ -46,6 +47,9 @@ class MailRuCloudAdapter extends AbstractAdapter
         return $this->client->createFile($path, $contents);
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function updateStream($path, $resource, Config $config)
     {
         $this->client->delete($path);
@@ -53,58 +57,70 @@ class MailRuCloudAdapter extends AbstractAdapter
         return $this->client->createFile($path, $resource);
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function rename($path, $newpath)
     {
         return $this->client->rename($path, $newpath);
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function copy($path, $newpath)
     {
         return $this->client->copy($path, $newpath);
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function delete($path)
     {
         return $this->client->delete($path);
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function deleteDir($dirname)
     {
         return $this->client->delete($dirname);
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function createDir($dirname, Config $config)
     {
         return $this->client->createFolder($dirname);
     }
     
+    /**
+     * @param string $path
+     * @return bool
+     */
     public function has($path)
     {
-        $path = explode(DIRECTORY_SEPARATOR, $path);
-        $file = array_pop($path);
-        $path = implode(DIRECTORY_SEPARATOR, $path);
-        
         try {
-            $files = $this->listContents($path);
-            $trimCount = mb_strlen($path);
-            
-            $files = array_map(function ($item) use ($trimCount) {
-                return ltrim(mb_substr($item['path'], $trimCount), DIRECTORY_SEPARATOR);
-            }, array_filter($files, function ($item) {
-                return $item['type'] == 'file';
-            }));
-            
-            return in_array($file, $files);
+            $this->getMetadata($path);
+            return true;
             
         } catch (ClientException $ex) {
             if ($ex->getCode() != 404) {
                 throw $ex;
             }
-        }
+        } catch (FileNotFoundException $ex) {}
         
         return false;
     }
     
+    /**
+     * @param string $path
+     * @return array|bool|false
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function read($path)
     {
         if (! $object = $this->readStream($path)) {
@@ -118,6 +134,11 @@ class MailRuCloudAdapter extends AbstractAdapter
         return $object;
     }
     
+    /**
+     * @param string $path
+     * @return array|bool|false
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function readStream($path)
     {
         $stream = tmpfile();
@@ -135,6 +156,9 @@ class MailRuCloudAdapter extends AbstractAdapter
         return ['type' => 'file', 'path' => $path, 'stream' => $stream];
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function listContents($directory = '', $recursive = false)
     {
         $items = [];
@@ -161,14 +185,41 @@ class MailRuCloudAdapter extends AbstractAdapter
         return $items;
     }
     
+    /**
+     * @param string $path
+     * @return array|false
+     * @throws FileNotFoundException
+     */
     public function getMetadata($path)
     {
-        // TODO: Implement getMetadata() method.
+        $path = explode(DIRECTORY_SEPARATOR, $path);
+        $file = array_pop($path);
+        $directory = implode(DIRECTORY_SEPARATOR, $path);
+        
+        $meta = null;
+        
+        foreach ($this->client->files($directory)->body->list as $fileMeta) {
+            if ($fileMeta->name == $file) {
+                $meta = $fileMeta;
+                break;
+            }
+        }
+        
+        if ( !$meta) {
+            throw new FileNotFoundException($directory);
+        }
+        
+        return (array)$meta;
     }
     
+    /**
+     * @param string $path
+     * @return array|false|mixed|null
+     * @throws FileNotFoundException
+     */
     public function getSize($path)
     {
-        // TODO: Implement getSize() method.
+        return $this->getMetadata($path)['size'] ?? null;
     }
     
     /**
@@ -179,8 +230,13 @@ class MailRuCloudAdapter extends AbstractAdapter
         return ['mimetype' => MimeType::detectByFilename($path)];
     }
     
+    /**
+     * @param string $path
+     * @return array|false|mixed|null
+     * @throws FileNotFoundException
+     */
     public function getTimestamp($path)
     {
-        // TODO: Implement getTimestamp() method.
+        return $this->getMetadata($path)['mtime'] ?? null;
     }
 }
