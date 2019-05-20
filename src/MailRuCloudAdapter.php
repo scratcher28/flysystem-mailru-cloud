@@ -3,6 +3,7 @@
 namespace Freecod\FlysystemMailRuCloud;
 
 use Friday14\Mailru\Cloud;
+use GuzzleHttp\Exception\ClientException;
 use League\Flysystem\Adapter\AbstractAdapter;
 use League\Flysystem\Adapter\Polyfill\NotSupportingVisibilityTrait;
 use League\Flysystem\Config;
@@ -48,7 +49,7 @@ class MailRuCloudAdapter extends AbstractAdapter
     public function updateStream($path, $resource, Config $config)
     {
         $this->client->delete($path);
-    
+        
         return $this->client->createFile($path, $resource);
     }
     
@@ -79,14 +80,29 @@ class MailRuCloudAdapter extends AbstractAdapter
     
     public function has($path)
     {
+        $path = explode(DIRECTORY_SEPARATOR, $path);
+        $file = array_pop($path);
+        $path = implode(DIRECTORY_SEPARATOR, $path);
+        
         try {
-            $this->rename($path, $path);
+            $files = $this->listContents($path);
+            $trimCount = mb_strlen($path);
             
-        } catch (\Exception $ex) {
-            return false;
+            $files = array_map(function ($item) use ($trimCount) {
+                return ltrim(mb_substr($item['path'], $trimCount), DIRECTORY_SEPARATOR);
+            }, array_filter($files, function ($item) {
+                return $item['type'] == 'file';
+            }));
+            
+            return in_array($file, $files);
+            
+        } catch (ClientException $ex) {
+            if ($ex->getCode() != 404) {
+                throw $ex;
+            }
         }
         
-        return true;
+        return false;
     }
     
     public function read($path)
@@ -94,35 +110,55 @@ class MailRuCloudAdapter extends AbstractAdapter
         if (! $object = $this->readStream($path)) {
             return false;
         }
-    
+        
         $object['contents'] = stream_get_contents($object['stream']);
         fclose($object['stream']);
         unset($object['stream']);
-    
+        
         return $object;
     }
     
     public function readStream($path)
     {
-        $stream = fopen('php://temp', 'w+b');
+        $stream = tmpfile();
+        $tmpfilePath = stream_get_meta_data($stream);
         
-        $result = $this->client->download($path, $stream);
+        $result = $this->client->download(DIRECTORY_SEPARATOR . $path, $tmpfilePath['uri']);
         rewind($stream);
-    
+        
         if ( ! $result) {
             fclose($stream);
-        
+            
             return false;
         }
-    
+        
         return ['type' => 'file', 'path' => $path, 'stream' => $stream];
     }
     
     public function listContents($directory = '', $recursive = false)
     {
-        $dirs = $this->client->files($directory);
+        $items = [];
         
-        return $dirs;
+        $response = $this->client->files($directory);
+        
+        foreach ($response->body->list as $item) {
+            $element = [
+                'path' => ltrim($item->home, '/'),
+                'type' => $item->type == 'folder' ? 'dir' : 'file',
+                'size' => $item->size,
+            ];
+            
+            $items[] = $element;
+            
+            if ($item->type == 'folder' && $recursive) {
+                
+                $subItems = $this->listContents($item->home, $recursive);
+                
+                $items = array_merge($items, $subItems);
+            }
+        }
+        
+        return $items;
     }
     
     public function getMetadata($path)
