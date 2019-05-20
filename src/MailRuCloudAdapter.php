@@ -9,6 +9,7 @@ use League\Flysystem\Adapter\Polyfill\NotSupportingVisibilityTrait;
 use League\Flysystem\Config;
 use League\Flysystem\FileNotFoundException;
 use League\Flysystem\Util\MimeType;
+use SplFileObject;
 
 class MailRuCloudAdapter extends AbstractAdapter
 {
@@ -21,12 +22,32 @@ class MailRuCloudAdapter extends AbstractAdapter
         $this->client = $client;
     }
     
+    protected function makePath($path, Config $config)
+    {
+        $path = explode(DIRECTORY_SEPARATOR, $path);
+        array_pop($path);
+        
+        $current = '';
+        
+        foreach ($path as $directory) {
+            
+            $current = $current ? ($current . DIRECTORY_SEPARATOR . $directory) : $directory;
+            
+            if ( !$this->has($current)) {
+                $this->createDir($current, $config);
+            }
+        }
+    }
+    
     /**
      * {@inheritdoc}
      */
     public function write($path, $contents, Config $config)
     {
-        return $this->client->createFile($path, $contents);
+        $stream = tmpfile();
+        fputs($stream, $contents);
+        
+        return $this->writeStream($path, $stream, $config);
     }
     
     /**
@@ -34,7 +55,12 @@ class MailRuCloudAdapter extends AbstractAdapter
      */
     public function writeStream($path, $resource, Config $config)
     {
-        return $this->client->createFile($path, $resource);
+        $this->makePath($path, $config);
+        
+        $tmpFilePath = stream_get_meta_data($resource);
+        $file = new SplFileObject($tmpFilePath['uri']);
+        
+        return $this->client->upload($file, $path);
     }
     
     /**
@@ -42,9 +68,10 @@ class MailRuCloudAdapter extends AbstractAdapter
      */
     public function update($path, $contents, Config $config)
     {
-        $this->client->delete($path);
+        $stream = tmpfile();
+        fputs($stream, $contents);
         
-        return $this->client->createFile($path, $contents);
+        return $this->updateStream($path, $stream, $config);
     }
     
     /**
@@ -54,7 +81,10 @@ class MailRuCloudAdapter extends AbstractAdapter
     {
         $this->client->delete($path);
         
-        return $this->client->createFile($path, $resource);
+        $tmpFilePath = stream_get_meta_data($resource);
+        $file = new SplFileObject($tmpFilePath['uri']);
+        
+        return $this->client->upload($file, $path);
     }
     
     /**
@@ -237,6 +267,6 @@ class MailRuCloudAdapter extends AbstractAdapter
      */
     public function getTimestamp($path)
     {
-        return $this->getMetadata($path)['mtime'] ?? null;
+        return ['timestamp' => $this->getMetadata($path)['mtime'] ?? null];
     }
 }
