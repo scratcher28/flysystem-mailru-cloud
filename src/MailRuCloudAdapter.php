@@ -135,8 +135,7 @@ class MailRuCloudAdapter extends AbstractAdapter
     {
         try {
             $this->getMetadata($path);
-            return true;
-            
+            return true;            
         } catch (ClientException $ex) {
             if ($ex->getCode() != 404) {
                 throw $ex;
@@ -173,8 +172,7 @@ class MailRuCloudAdapter extends AbstractAdapter
     {
         $stream = tmpfile();
         $tmpfilePath = stream_get_meta_data($stream);
-        
-        $result = $this->client->download(DIRECTORY_SEPARATOR . $path, $tmpfilePath['uri']);
+        $result = $this->client->download('/' . $path, $tmpfilePath['uri']);
         rewind($stream);
         
         if ( ! $result) {
@@ -222,22 +220,35 @@ class MailRuCloudAdapter extends AbstractAdapter
      */
     public function getMetadata($path)
     {
-        $path = explode(DIRECTORY_SEPARATOR, $path);
-        $file = array_pop($path);
-        $directory = implode(DIRECTORY_SEPARATOR, $path);
-        
+        $_path = explode('/', $path);
+        $file = array_pop($_path);
+        $directory = implode('/', $_path);
         $meta = null;
-        
-        foreach ($this->client->files($directory)->body->list as $fileMeta) {
+		$list = $this->client->files($directory)->body->list;
+		$i = 0;
+        foreach ($list as $fileMeta) {
             if ($fileMeta->name == $file) {
                 $meta = $fileMeta;
                 break;
             }
+            $i++;
         }
         
-        if ( !$meta) {
-            throw new FileNotFoundException($directory);
-        }
+        if ( !$meta ) {
+			if ($i < 500) {
+				throw new FileNotFoundException($directory);
+			}
+			$meta = [
+				"mtime" => 0, 
+				"virus_scan" => "pass",
+				"name" => $file, 
+				"size" => 0,
+				"hash" => "", // sha1
+				"kind" => "file",
+				"type" => "file",
+				"home" => '/' . $path,
+			];
+        } 
         
         return (array)$meta;
     }
