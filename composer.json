@@ -21,7 +21,7 @@
         "php": "^7.0",
         "ext-mbstring": "*",
         "league/flysystem": "^1.0",
-        "friday14/cloud-mail-ru": "dev-master"
+        "scratcher28/cloud-mail-ru": "dev-master"
     },
     "autoload": {
         "psr-4": {
