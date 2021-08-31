@@ -1,4 +1,4 @@
-# Flysystem adapter for the Mail.ru Cloud
+# Flysystem adapter for the Mail.ru Cloud (mod)
 
 This package contains a [Flysystem](https://flysystem.thephpleague.com/) adapter for Mail.ru Cloud. Under the hood, the [Friday14/mailru-cloud-php](https://github.com/Friday14/mailru-cloud-php) is used.
 
