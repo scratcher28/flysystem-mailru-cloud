@@ -20,7 +20,7 @@
     "require": {
         "php": "^7.0",
         "ext-mbstring": "*",
-        "league/flysystem": "^2.0",
+        "league/flysystem": "^1.1",
         "friday14/cloud-mail-ru": "dev-master"
     },
     "autoload": {
