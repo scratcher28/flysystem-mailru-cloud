@@ -18,7 +18,7 @@
         }
     ],
     "require": {
-        "php": "^7.0",
+        "php": "^7.0|^8.0",
         "ext-mbstring": "*",
         "league/flysystem": "^1.1",
         "scratcher28/cloud-mail-ru": "dev-master"
